@@ -69,6 +69,46 @@ class UsersController extends Controller
         }
     }
 
+     /**
+     * Get all users with admin role.
+     *
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function getAllAdmins()
+    {
+        try {
+            $admins = User::with('admin')
+                ->where('role', 'admin')
+                ->get()
+                ->map(function ($user) {
+                    return [
+                        'id' => $user->id,
+                        'username' => $user->username,
+                        'role' => $user->role,
+                        'status_aktif' => $user->status_aktif,
+                        'createdAt' => $user->createdAt,
+                        'updatedAt' => $user->updatedAt,
+                        'profile' => $user->admin ? [
+                            'admin_id' => $user->admin->admin_id,
+                            'nama_lengkap' => $user->admin->nama_lengkap,
+                        ] : null,
+                    ];
+                });
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Admin users retrieved successfully',
+                'data' => $admins,
+            ], 200);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to retrieve admin users',
+                'error' => $e->getMessage(),
+            ], 500);
+        }
+    }
+
     /**
      * Get all users with guru role.
      *
