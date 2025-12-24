@@ -10,3 +10,5 @@ Route::get('/users/gurus', [UsersController::class, 'getAllGurus']);
 Route::get('/users/siswas', [UsersController::class, 'getAllSiswas']);
 Route::get('/users/count', [UsersController::class, 'countUsersByRole']);
 Route::get('/users/{id}', [UsersController::class, 'getUserDetail']);
+Route::put('/users/{id}', [UsersController::class, 'updateUser']);
+Route::delete('/users/{id}', [UsersController::class, 'deleteUser']);
