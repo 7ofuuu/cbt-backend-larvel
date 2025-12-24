@@ -9,3 +9,4 @@ Route::get('/users/admins', [UsersController::class, 'getAllAdmins']);
 Route::get('/users/gurus', [UsersController::class, 'getAllGurus']);
 Route::get('/users/siswas', [UsersController::class, 'getAllSiswas']);
 Route::get('/users/count', [UsersController::class, 'countUsersByRole']);
+Route::get('/users/{id}', [UsersController::class, 'getUserDetail']);

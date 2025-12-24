@@ -223,4 +223,70 @@ class UsersController extends Controller
             ], 500);
         }
     }
+
+    /**
+     * Get user detail by ID with role-specific profile.
+     *
+     * @param  int  $id
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function getUserDetail($id)
+    {
+        try {
+            $user = User::with(['admin', 'guru', 'siswa'])->find($id);
+
+            if (!$user) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'User not found',
+                ], 404);
+            }
+
+            $userData = [
+                'id' => $user->id,
+                'username' => $user->username,
+                'role' => $user->role,
+                'status_aktif' => $user->status_aktif,
+                'createdAt' => $user->createdAt,
+                'updatedAt' => $user->updatedAt,
+            ];
+
+            // Add role-specific profile data
+            switch ($user->role) {
+                case 'admin':
+                    $userData['profile'] = $user->admin ? [
+                        'admin_id' => $user->admin->admin_id,
+                        'nama_lengkap' => $user->admin->nama_lengkap,
+                    ] : null;
+                    break;
+                case 'guru':
+                    $userData['profile'] = $user->guru ? [
+                        'guru_id' => $user->guru->guru_id,
+                        'nama_lengkap' => $user->guru->nama_lengkap,
+                    ] : null;
+                    break;
+                case 'siswa':
+                    $userData['profile'] = $user->siswa ? [
+                        'siswa_id' => $user->siswa->siswa_id,
+                        'nama_lengkap' => $user->siswa->nama_lengkap,
+                        'kelas' => $user->siswa->kelas,
+                        'tingkat' => $user->siswa->tingkat,
+                        'jurusan' => $user->siswa->jurusan,
+                    ] : null;
+                    break;
+            }
+
+            return response()->json([
+                'success' => true,
+                'message' => 'User detail retrieved successfully',
+                'data' => $userData,
+            ], 200);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to retrieve user detail',
+                'error' => $e->getMessage(),
+            ], 500);
+        }
+    }
 }
