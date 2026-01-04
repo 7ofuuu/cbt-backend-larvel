@@ -3,10 +3,390 @@
 namespace App\Http\Controllers;
 
 use App\Models\User;
+use App\Models\Admin;
+use App\Models\Guru;
+use App\Models\Siswa;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Hash;
 
 class UsersController extends Controller
 {
+    /**
+     * Create a new user (Admin only).
+     *
+     * @param  \Illuminate\Http\Request  $request
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function createUser(Request $request)
+    {
+        try {
+            $username = $request->input('username');
+            $password = $request->input('password');
+            $role = $request->input('role');
+            $nama = $request->input('nama');
+            $kelas = $request->input('kelas');
+            $tingkat = $request->input('tingkat');
+            $jurusan = $request->input('jurusan');
+
+            // Validate required fields
+            if (!$username || !$password || !$role || !$nama) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Data tidak lengkap. Username, password, role, dan nama wajib diisi.',
+                    'error' => 'Data tidak lengkap. Username, password, role, dan nama wajib diisi.',
+                ], 400);
+            }
+
+            // Validate role
+            if (!in_array($role, ['admin', 'guru', 'siswa'])) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Role tidak valid. Pilih admin, guru, atau siswa.',
+                    'error' => 'Role tidak valid. Pilih admin, guru, atau siswa.',
+                ], 400);
+            }
+
+            // Validate role-specific fields for siswa
+            if ($role === 'siswa' && (!$kelas || !$tingkat || !$jurusan)) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Data siswa tidak lengkap. Kelas, tingkat, dan jurusan wajib diisi untuk siswa.',
+                    'error' => 'Data siswa tidak lengkap. Kelas, tingkat, dan jurusan wajib diisi untuk siswa.',
+                ], 400);
+            }
+
+            // Validate kelas format for siswa (must be "IPA 01" or "IPS 02" format)
+            if ($role === 'siswa') {
+                $kelasPattern = '/^(IPA|IPS)\s+(0[1-9]|[1-9][0-9])$/';
+                if (!preg_match($kelasPattern, $kelas)) {
+                    return response()->json([
+                        'success' => false,
+                        'message' => 'Format kelas tidak valid. Gunakan format: IPA/IPS diikuti spasi dan nomor kelas (contoh: IPA 01, IPS 02)',
+                        'error' => 'Format kelas tidak valid. Gunakan format: IPA/IPS diikuti spasi dan nomor kelas (contoh: IPA 01, IPS 02)',
+                    ], 400);
+                }
+            }
+
+            // Check if username already exists
+            $existingUser = User::where('username', $username)->first();
+            if ($existingUser) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Username sudah digunakan',
+                    'error' => 'Username sudah digunakan',
+                ], 400);
+            }
+
+            // Create user with transaction
+            $result = DB::transaction(function () use ($username, $password, $role, $nama, $kelas, $tingkat, $jurusan) {
+                $newUser = User::create([
+                    'username' => $username,
+                    'password' => Hash::make($password),
+                    'role' => $role,
+                ]);
+
+                // Create role-specific profile
+                if ($role === 'siswa') {
+                    Siswa::create([
+                        'userId' => $newUser->id,
+                        'nama_lengkap' => $nama,
+                        'kelas' => $kelas,
+                        'tingkat' => $tingkat,
+                        'jurusan' => $jurusan,
+                    ]);
+                } else if ($role === 'guru') {
+                    Guru::create([
+                        'userId' => $newUser->id,
+                        'nama_lengkap' => $nama,
+                    ]);
+                } else if ($role === 'admin') {
+                    Admin::create([
+                        'userId' => $newUser->id,
+                        'nama_lengkap' => $nama,
+                    ]);
+                }
+
+                return $newUser;
+            });
+
+            return response()->json([
+                'success' => true,
+                'message' => 'User berhasil dibuat',
+                'userId' => $result->id,
+                'data' => [
+                    'userId' => $result->id,
+                ],
+            ], 201);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Gagal membuat user',
+                'error' => $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    /**
+     * Batch create users (Admin only).
+     *
+     * @param  \Illuminate\Http\Request  $request
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function batchCreateUsers(Request $request)
+    {
+        try {
+            $users = $request->input('users');
+
+            if (!is_array($users) || count($users) === 0) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Data users harus berupa array dan tidak boleh kosong',
+                ], 400);
+            }
+
+            $results = [
+                'success' => 0,
+                'failed' => 0,
+                'total' => count($users),
+                'errors' => [],
+            ];
+
+            foreach ($users as $userData) {
+                try {
+                    $username = $userData['username'] ?? null;
+                    $password = $userData['password'] ?? null;
+                    $role = $userData['role'] ?? null;
+                    $nama = $userData['nama'] ?? null;
+                    $kelas = $userData['kelas'] ?? null;
+                    $tingkat = $userData['tingkat'] ?? null;
+                    $jurusan = $userData['jurusan'] ?? null;
+
+                    // Validate required fields
+                    if (!$username || !$password || !$role || !$nama) {
+                        $results['failed']++;
+                        $results['errors'][] = ['username' => $username, 'error' => 'Data tidak lengkap'];
+                        continue;
+                    }
+
+                    // Validate role
+                    if (!in_array($role, ['admin', 'guru', 'siswa'])) {
+                        $results['failed']++;
+                        $results['errors'][] = ['username' => $username, 'error' => 'Role tidak valid'];
+                        continue;
+                    }
+
+                    // Validate role-specific fields for siswa
+                    if ($role === 'siswa' && (!$kelas || !$tingkat || !$jurusan)) {
+                        $results['failed']++;
+                        $results['errors'][] = ['username' => $username, 'error' => 'Data siswa tidak lengkap (kelas, tingkat, jurusan)'];
+                        continue;
+                    }
+
+                    // Validate kelas format for siswa
+                    if ($role === 'siswa') {
+                        $kelasPattern = '/^(IPA|IPS)\s+(0[1-9]|[1-9][0-9])$/';
+                        if (!preg_match($kelasPattern, $kelas)) {
+                            $results['failed']++;
+                            $results['errors'][] = [
+                                'username' => $username,
+                                'error' => "Format kelas tidak valid: \"{$kelas}\". Gunakan format: IPA/IPS + spasi + nomor (contoh: IPA 01)"
+                            ];
+                            continue;
+                        }
+                    }
+
+                    // Check if username already exists
+                    $existingUser = User::where('username', $username)->first();
+                    if ($existingUser) {
+                        $results['failed']++;
+                        $results['errors'][] = ['username' => $username, 'error' => 'Username sudah digunakan'];
+                        continue;
+                    }
+
+                    // Create user with transaction
+                    DB::transaction(function () use ($username, $password, $role, $nama, $kelas, $tingkat, $jurusan) {
+                        $newUser = User::create([
+                            'username' => $username,
+                            'password' => Hash::make($password),
+                            'role' => $role,
+                        ]);
+
+                        // Create role-specific profile
+                        if ($role === 'siswa') {
+                            Siswa::create([
+                                'userId' => $newUser->id,
+                                'nama_lengkap' => $nama,
+                                'kelas' => $kelas,
+                                'tingkat' => $tingkat,
+                                'jurusan' => $jurusan,
+                            ]);
+                        } else if ($role === 'guru') {
+                            Guru::create([
+                                'userId' => $newUser->id,
+                                'nama_lengkap' => $nama,
+                            ]);
+                        } else if ($role === 'admin') {
+                            Admin::create([
+                                'userId' => $newUser->id,
+                                'nama_lengkap' => $nama,
+                            ]);
+                        }
+                    });
+
+                    $results['success']++;
+                } catch (\Exception $e) {
+                    $results['failed']++;
+                    $results['errors'][] = [
+                        'username' => $userData['username'] ?? 'unknown',
+                        'error' => $e->getMessage(),
+                    ];
+                }
+            }
+
+            // Return response with results at root level for frontend compatibility
+            return response()->json([
+                'success' => $results['success'],
+                'failed' => $results['failed'],
+                'total' => $results['total'],
+                'errors' => $results['errors'],
+                'message' => 'Batch import selesai',
+            ], 200);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Gagal batch import users',
+                'error' => $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    /**
+     * Update user role (Admin only).
+     *
+     * @param  \Illuminate\Http\Request  $request
+     * @param  int  $id
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function updateUserRole(Request $request, $id)
+    {
+        try {
+            $role = $request->input('role');
+
+            // Validate role
+            if (!in_array($role, ['admin', 'guru', 'siswa'])) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Role tidak valid',
+                ], 400);
+            }
+
+            $user = User::with(['admin', 'guru', 'siswa'])->find($id);
+
+            if (!$user) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'User tidak ditemukan',
+                ], 404);
+            }
+
+            // If role is the same, skip
+            if ($user->role === $role) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Role sudah sama',
+                ], 400);
+            }
+
+            DB::transaction(function () use ($user, $role) {
+                // Delete old profile
+                if ($user->admin) {
+                    $user->admin->delete();
+                }
+                if ($user->guru) {
+                    $user->guru->delete();
+                }
+                if ($user->siswa) {
+                    $user->siswa->delete();
+                }
+
+                // Update role
+                $user->role = $role;
+                $user->save();
+
+                // Create new profile with default data
+                if ($role === 'admin') {
+                    Admin::create([
+                        'userId' => $user->id,
+                        'nama_lengkap' => 'Admin',
+                    ]);
+                } else if ($role === 'guru') {
+                    Guru::create([
+                        'userId' => $user->id,
+                        'nama_lengkap' => 'Guru',
+                    ]);
+                } else if ($role === 'siswa') {
+                    Siswa::create([
+                        'userId' => $user->id,
+                        'nama_lengkap' => 'Siswa',
+                        'kelas' => '-',
+                        'tingkat' => '-',
+                        'jurusan' => '-',
+                    ]);
+                }
+            });
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Role user berhasil diubah',
+            ], 200);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Gagal mengubah role user',
+                'error' => $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    /**
+     * Toggle user status (Admin only).
+     *
+     * @param  int  $id
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function toggleUserStatus($id)
+    {
+        try {
+            $user = User::find($id);
+
+            if (!$user) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'User tidak ditemukan',
+                ], 404);
+            }
+
+            $user->status_aktif = !$user->status_aktif;
+            $user->save();
+
+            return response()->json([
+                'success' => true,
+                'message' => $user->status_aktif ? 'User diaktifkan' : 'User dinonaktifkan',
+                'data' => [
+                    'status_aktif' => $user->status_aktif,
+                ],
+            ], 200);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Gagal mengubah status user',
+                'error' => $e->getMessage(),
+            ], 500);
+        }
+    }
+
+
     /**
      * Get all users with their related profiles.
      *
@@ -17,9 +397,31 @@ class UsersController extends Controller
     {
         try {
             $perPage = $request->input('per_page', 10);
+            $role = $request->input('role');
+            $status_aktif = $request->input('status_aktif');
+            $username = $request->input('username');
             
-            $users = User::with(['admin', 'guru', 'siswa'])
-                ->paginate($perPage);
+            $query = User::with(['admin', 'guru', 'siswa']);
+            
+            // Filter by role
+            if ($role) {
+                $query->where('role', $role);
+            }
+            
+            // Filter by status_aktif
+            if ($status_aktif !== null) {
+                $query->where('status_aktif', $status_aktif === 'true' || $status_aktif === '1');
+            }
+            
+            // Filter by username (exact match for checking availability)
+            if ($username) {
+                $query->where('username', $username);
+            }
+            
+            // Order by createdAt desc (same as Express)
+            $query->orderBy('createdAt', 'desc');
+            
+            $users = $query->paginate($perPage);
 
             $data = $users->map(function ($user) {
                 $userData = [
@@ -34,25 +436,28 @@ class UsersController extends Controller
                 // Add role-specific profile data
                 switch ($user->role) {
                     case 'admin':
-                        $userData['profile'] = $user->admin ? [
+                        $userData['admin'] = $user->admin ? [
                             'admin_id' => $user->admin->admin_id,
                             'nama_lengkap' => $user->admin->nama_lengkap,
                         ] : null;
+                        $userData['profile'] = $userData['admin'];
                         break;
                     case 'guru':
-                        $userData['profile'] = $user->guru ? [
+                        $userData['guru'] = $user->guru ? [
                             'guru_id' => $user->guru->guru_id,
                             'nama_lengkap' => $user->guru->nama_lengkap,
                         ] : null;
+                        $userData['profile'] = $userData['guru'];
                         break;
                     case 'siswa':
-                        $userData['profile'] = $user->siswa ? [
+                        $userData['siswa'] = $user->siswa ? [
                             'siswa_id' => $user->siswa->siswa_id,
                             'nama_lengkap' => $user->siswa->nama_lengkap,
                             'kelas' => $user->siswa->kelas,
                             'tingkat' => $user->siswa->tingkat,
                             'jurusan' => $user->siswa->jurusan,
                         ] : null;
+                        $userData['profile'] = $userData['siswa'];
                         break;
                 }
 
@@ -62,6 +467,7 @@ class UsersController extends Controller
             return response()->json([
                 'success' => true,
                 'message' => 'Users retrieved successfully',
+                'users' => $data,  // Add 'users' key for Express compatibility
                 'data' => $data,
                 'pagination' => [
                     'current_page' => $users->currentPage(),
