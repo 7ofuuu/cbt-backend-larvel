@@ -196,6 +196,9 @@ class UsersController extends Controller
         try {
             $perPage = $request->input('per_page', 10);
             $search = $request->input('search');
+            $tingkat = $request->input('tingkat');
+            $jurusan = $request->input('jurusan');
+            $kelas = $request->input('kelas');
             
             $query = User::with('siswa')
                 ->where('role', 'siswa');
@@ -204,6 +207,27 @@ class UsersController extends Controller
             if ($search) {
                 $query->whereHas('siswa', function ($q) use ($search) {
                     $q->where('nama_lengkap', 'like', '%' . $search . '%');
+                });
+            }
+            
+            // Add filter for tingkat
+            if ($tingkat) {
+                $query->whereHas('siswa', function ($q) use ($tingkat) {
+                    $q->where('tingkat', $tingkat);
+                });
+            }
+            
+            // Add filter for jurusan
+            if ($jurusan) {
+                $query->whereHas('siswa', function ($q) use ($jurusan) {
+                    $q->where('jurusan', $jurusan);
+                });
+            }
+            
+            // Add filter for kelas
+            if ($kelas) {
+                $query->whereHas('siswa', function ($q) use ($kelas) {
+                    $q->where('kelas', 'like', '%' . $kelas);
                 });
             }
             
