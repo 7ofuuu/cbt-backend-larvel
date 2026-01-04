@@ -30,10 +30,6 @@ class HasilUjianController extends Controller
                 ->get();
 
             $formattedUjians = $completedUjians->map(function ($ujian) {
-                $nilaiList = $ujian->peserta_ujians
-                    ->pluck('hasil_ujians.nilai_akhir')
-                    ->filter(fn($nilai) => !is_null($nilai));
-
                 return [
                     'ujian_id' => $ujian->ujian_id,
                     'nama_ujian' => $ujian->nama_ujian,
@@ -45,9 +41,6 @@ class HasilUjianController extends Controller
                         'total_peserta' => $ujian->peserta_ujians_count,
                         'total_selesai' => $ujian->peserta_ujians->count(),
                         'total_soal' => $ujian->soal_ujians_count,
-                        'nilai_tertinggi' => $nilaiList->isNotEmpty() ? $nilaiList->max() : 0,
-                        'nilai_terendah' => $nilaiList->isNotEmpty() ? $nilaiList->min() : 0,
-                        'nilai_rata_rata' => $nilaiList->isNotEmpty() ? round($nilaiList->avg(), 2) : 0,
                     ],
                     'peserta_results' => $ujian->peserta_ujians->map(fn($p) => [
                         'peserta_ujian_id' => $p->peserta_ujian_id,
