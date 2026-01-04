@@ -56,14 +56,56 @@ class UsersController extends Controller
                 ], 400);
             }
 
-            // Validate kelas format for siswa (must be "IPA 01" or "IPS 02" format)
+            // Validate tingkat value
+            $validTingkats = ['X', 'XI', 'XII'];
+            if ($role === 'siswa' && !in_array($tingkat, $validTingkats)) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Tingkat tidak valid. Pilih salah satu: ' . implode(', ', $validTingkats),
+                    'error' => 'Tingkat tidak valid. Pilih salah satu: ' . implode(', ', $validTingkats),
+                ], 400);
+            }
+
+            // Validate jurusan value
+            $validJurusans = ['IPA', 'IPS', 'Bahasa'];
+            if ($role === 'siswa' && !in_array($jurusan, $validJurusans)) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Jurusan tidak valid. Pilih salah satu: ' . implode(', ', $validJurusans),
+                    'error' => 'Jurusan tidak valid. Pilih salah satu: ' . implode(', ', $validJurusans),
+                ], 400);
+            }
+
+            // Validate kelas format for siswa (must be "X-IPA-1" or "XII-IPS-2" format)
             if ($role === 'siswa') {
-                $kelasPattern = '/^(IPA|IPS)\s+(0[1-9]|[1-9][0-9])$/';
+                // Format: tingkat-jurusan-nomor (contoh: XII-IPA-1, X-IPS-2)
+                $kelasPattern = '/^(X|XI|XII)-(IPA|IPS|Bahasa)-(\d+)$/';
                 if (!preg_match($kelasPattern, $kelas)) {
                     return response()->json([
                         'success' => false,
-                        'message' => 'Format kelas tidak valid. Gunakan format: IPA/IPS diikuti spasi dan nomor kelas (contoh: IPA 01, IPS 02)',
-                        'error' => 'Format kelas tidak valid. Gunakan format: IPA/IPS diikuti spasi dan nomor kelas (contoh: IPA 01, IPS 02)',
+                        'message' => 'Format kelas tidak valid. Gunakan format: tingkat-jurusan-nomor (contoh: XII-IPA-1, X-IPS-2)',
+                        'error' => 'Format kelas tidak valid. Gunakan format: tingkat-jurusan-nomor (contoh: XII-IPA-1, X-IPS-2)',
+                    ], 400);
+                }
+
+                // Validate consistency: kelas must match tingkat and jurusan
+                preg_match($kelasPattern, $kelas, $matches);
+                $kelasTingkat = $matches[1];
+                $kelasJurusan = $matches[2];
+                
+                if ($kelasTingkat !== $tingkat) {
+                    return response()->json([
+                        'success' => false,
+                        'message' => "Tingkat pada kelas ({$kelasTingkat}) tidak sesuai dengan tingkat yang dipilih ({$tingkat})",
+                        'error' => "Tingkat pada kelas ({$kelasTingkat}) tidak sesuai dengan tingkat yang dipilih ({$tingkat})",
+                    ], 400);
+                }
+
+                if ($kelasJurusan !== $jurusan) {
+                    return response()->json([
+                        'success' => false,
+                        'message' => "Jurusan pada kelas ({$kelasJurusan}) tidak sesuai dengan jurusan yang dipilih ({$jurusan})",
+                        'error' => "Jurusan pada kelas ({$kelasJurusan}) tidak sesuai dengan jurusan yang dipilih ({$jurusan})",
                     ], 400);
                 }
             }
@@ -183,14 +225,53 @@ class UsersController extends Controller
                         continue;
                     }
 
-                    // Validate kelas format for siswa
+                    // Validate tingkat value
+                    $validTingkats = ['X', 'XI', 'XII'];
+                    if ($role === 'siswa' && !in_array($tingkat, $validTingkats)) {
+                        $results['failed']++;
+                        $results['errors'][] = ['username' => $username, 'error' => "Tingkat tidak valid: \"{$tingkat}\". Pilih: " . implode(', ', $validTingkats)];
+                        continue;
+                    }
+
+                    // Validate jurusan value
+                    $validJurusans = ['IPA', 'IPS', 'Bahasa'];
+                    if ($role === 'siswa' && !in_array($jurusan, $validJurusans)) {
+                        $results['failed']++;
+                        $results['errors'][] = ['username' => $username, 'error' => "Jurusan tidak valid: \"{$jurusan}\". Pilih: " . implode(', ', $validJurusans)];
+                        continue;
+                    }
+
+                    // Validate kelas format for siswa (tingkat-jurusan-nomor)
                     if ($role === 'siswa') {
-                        $kelasPattern = '/^(IPA|IPS)\s+(0[1-9]|[1-9][0-9])$/';
+                        $kelasPattern = '/^(X|XI|XII)-(IPA|IPS|Bahasa)-(\d+)$/';
                         if (!preg_match($kelasPattern, $kelas)) {
                             $results['failed']++;
                             $results['errors'][] = [
                                 'username' => $username,
-                                'error' => "Format kelas tidak valid: \"{$kelas}\". Gunakan format: IPA/IPS + spasi + nomor (contoh: IPA 01)"
+                                'error' => "Format kelas tidak valid: \"{$kelas}\". Gunakan format: tingkat-jurusan-nomor (contoh: XII-IPA-1)"
+                            ];
+                            continue;
+                        }
+
+                        // Validate consistency: kelas must match tingkat and jurusan
+                        preg_match($kelasPattern, $kelas, $matches);
+                        $kelasTingkat = $matches[1];
+                        $kelasJurusan = $matches[2];
+                        
+                        if ($kelasTingkat !== $tingkat) {
+                            $results['failed']++;
+                            $results['errors'][] = [
+                                'username' => $username,
+                                'error' => "Tingkat pada kelas ({$kelasTingkat}) tidak sesuai dengan tingkat ({$tingkat})"
+                            ];
+                            continue;
+                        }
+
+                        if ($kelasJurusan !== $jurusan) {
+                            $results['failed']++;
+                            $results['errors'][] = [
+                                'username' => $username,
+                                'error' => "Jurusan pada kelas ({$kelasJurusan}) tidak sesuai dengan jurusan ({$jurusan})"
                             ];
                             continue;
                         }
@@ -820,12 +901,65 @@ class UsersController extends Controller
                         }
                         break;
                     case 'guru':
-                        if ($user->admin) {
+                        if ($user->guru) {
                             $user->guru->update($profileData);
                         }
                         break;
                     case 'siswa':
                         if ($user->siswa) {
+                            // Validate kelas format if kelas is being updated
+                            if (isset($profileData['kelas'])) {
+                                $kelas = $profileData['kelas'];
+                                $tingkat = $profileData['tingkat'] ?? $user->siswa->tingkat;
+                                $jurusan = $profileData['jurusan'] ?? $user->siswa->jurusan;
+                                
+                                // Validate tingkat value
+                                $validTingkats = ['X', 'XI', 'XII'];
+                                if (isset($profileData['tingkat']) && !in_array($tingkat, $validTingkats)) {
+                                    return response()->json([
+                                        'success' => false,
+                                        'message' => 'Tingkat tidak valid. Pilih salah satu: ' . implode(', ', $validTingkats),
+                                    ], 400);
+                                }
+                                
+                                // Validate jurusan value
+                                $validJurusans = ['IPA', 'IPS', 'Bahasa'];
+                                if (isset($profileData['jurusan']) && !in_array($jurusan, $validJurusans)) {
+                                    return response()->json([
+                                        'success' => false,
+                                        'message' => 'Jurusan tidak valid. Pilih salah satu: ' . implode(', ', $validJurusans),
+                                    ], 400);
+                                }
+                                
+                                // Validate kelas format
+                                $kelasPattern = '/^(X|XI|XII)-(IPA|IPS|Bahasa)-(\d+)$/';
+                                if (!preg_match($kelasPattern, $kelas)) {
+                                    return response()->json([
+                                        'success' => false,
+                                        'message' => 'Format kelas tidak valid. Gunakan format: tingkat-jurusan-nomor (contoh: XII-IPA-1)',
+                                    ], 400);
+                                }
+                                
+                                // Validate consistency
+                                preg_match($kelasPattern, $kelas, $matches);
+                                $kelasTingkat = $matches[1];
+                                $kelasJurusan = $matches[2];
+                                
+                                if ($kelasTingkat !== $tingkat) {
+                                    return response()->json([
+                                        'success' => false,
+                                        'message' => "Tingkat pada kelas ({$kelasTingkat}) tidak sesuai dengan tingkat ({$tingkat})",
+                                    ], 400);
+                                }
+                                
+                                if ($kelasJurusan !== $jurusan) {
+                                    return response()->json([
+                                        'success' => false,
+                                        'message' => "Jurusan pada kelas ({$kelasJurusan}) tidak sesuai dengan jurusan ({$jurusan})",
+                                    ], 400);
+                                }
+                            }
+                            
                             $user->siswa->update($profileData);
                         }
                         break;
