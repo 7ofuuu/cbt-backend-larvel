@@ -10,55 +10,67 @@ class UsersController extends Controller
     /**
      * Get all users with their related profiles.
      *
+     * @param  \Illuminate\Http\Request  $request
      * @return \Illuminate\Http\JsonResponse
      */
-    public function getAllUsers()
+    public function getAllUsers(Request $request)
     {
         try {
+            $perPage = $request->input('per_page', 10);
+            
             $users = User::with(['admin', 'guru', 'siswa'])
-                ->get()
-                ->map(function ($user) {
-                    $userData = [
-                        'id' => $user->id,
-                        'username' => $user->username,
-                        'role' => $user->role,
-                        'status_aktif' => $user->status_aktif,
-                        'createdAt' => $user->createdAt,
-                        'updatedAt' => $user->updatedAt,
-                    ];
+                ->paginate($perPage);
 
-                    // Add role-specific profile data
-                    switch ($user->role) {
-                        case 'admin':
-                            $userData['profile'] = $user->admin ? [
-                                'admin_id' => $user->admin->admin_id,
-                                'nama_lengkap' => $user->admin->nama_lengkap,
-                            ] : null;
-                            break;
-                        case 'guru':
-                            $userData['profile'] = $user->guru ? [
-                                'guru_id' => $user->guru->guru_id,
-                                'nama_lengkap' => $user->guru->nama_lengkap,
-                            ] : null;
-                            break;
-                        case 'siswa':
-                            $userData['profile'] = $user->siswa ? [
-                                'siswa_id' => $user->siswa->siswa_id,
-                                'nama_lengkap' => $user->siswa->nama_lengkap,
-                                'kelas' => $user->siswa->kelas,
-                                'tingkat' => $user->siswa->tingkat,
-                                'jurusan' => $user->siswa->jurusan,
-                            ] : null;
-                            break;
-                    }
+            $data = $users->map(function ($user) {
+                $userData = [
+                    'id' => $user->id,
+                    'username' => $user->username,
+                    'role' => $user->role,
+                    'status_aktif' => $user->status_aktif,
+                    'createdAt' => $user->createdAt,
+                    'updatedAt' => $user->updatedAt,
+                ];
 
-                    return $userData;
-                });
+                // Add role-specific profile data
+                switch ($user->role) {
+                    case 'admin':
+                        $userData['profile'] = $user->admin ? [
+                            'admin_id' => $user->admin->admin_id,
+                            'nama_lengkap' => $user->admin->nama_lengkap,
+                        ] : null;
+                        break;
+                    case 'guru':
+                        $userData['profile'] = $user->guru ? [
+                            'guru_id' => $user->guru->guru_id,
+                            'nama_lengkap' => $user->guru->nama_lengkap,
+                        ] : null;
+                        break;
+                    case 'siswa':
+                        $userData['profile'] = $user->siswa ? [
+                            'siswa_id' => $user->siswa->siswa_id,
+                            'nama_lengkap' => $user->siswa->nama_lengkap,
+                            'kelas' => $user->siswa->kelas,
+                            'tingkat' => $user->siswa->tingkat,
+                            'jurusan' => $user->siswa->jurusan,
+                        ] : null;
+                        break;
+                }
+
+                return $userData;
+            });
 
             return response()->json([
                 'success' => true,
                 'message' => 'Users retrieved successfully',
-                'data' => $users,
+                'data' => $data,
+                'pagination' => [
+                    'current_page' => $users->currentPage(),
+                    'last_page' => $users->lastPage(),
+                    'per_page' => $users->perPage(),
+                    'total' => $users->total(),
+                    'from' => $users->firstItem(),
+                    'to' => $users->lastItem(),
+                ],
             ], 200);
         } catch (\Exception $e) {
             return response()->json([
@@ -72,33 +84,45 @@ class UsersController extends Controller
      /**
      * Get all users with admin role.
      *
+     * @param  \Illuminate\Http\Request  $request
      * @return \Illuminate\Http\JsonResponse
      */
-    public function getAllAdmins()
+    public function getAllAdmins(Request $request)
     {
         try {
+            $perPage = $request->input('per_page', 10);
+            
             $admins = User::with('admin')
                 ->where('role', 'admin')
-                ->get()
-                ->map(function ($user) {
-                    return [
-                        'id' => $user->id,
-                        'username' => $user->username,
-                        'role' => $user->role,
-                        'status_aktif' => $user->status_aktif,
-                        'createdAt' => $user->createdAt,
-                        'updatedAt' => $user->updatedAt,
-                        'profile' => $user->admin ? [
-                            'admin_id' => $user->admin->admin_id,
-                            'nama_lengkap' => $user->admin->nama_lengkap,
-                        ] : null,
-                    ];
-                });
+                ->paginate($perPage);
+
+            $data = $admins->map(function ($user) {
+                return [
+                    'id' => $user->id,
+                    'username' => $user->username,
+                    'role' => $user->role,
+                    'status_aktif' => $user->status_aktif,
+                    'createdAt' => $user->createdAt,
+                    'updatedAt' => $user->updatedAt,
+                    'profile' => $user->admin ? [
+                        'admin_id' => $user->admin->admin_id,
+                        'nama_lengkap' => $user->admin->nama_lengkap,
+                    ] : null,
+                ];
+            });
 
             return response()->json([
                 'success' => true,
                 'message' => 'Admin users retrieved successfully',
-                'data' => $admins,
+                'data' => $data,
+                'pagination' => [
+                    'current_page' => $admins->currentPage(),
+                    'last_page' => $admins->lastPage(),
+                    'per_page' => $admins->perPage(),
+                    'total' => $admins->total(),
+                    'from' => $admins->firstItem(),
+                    'to' => $admins->lastItem(),
+                ],
             ], 200);
         } catch (\Exception $e) {
             return response()->json([
@@ -112,33 +136,45 @@ class UsersController extends Controller
     /**
      * Get all users with guru role.
      *
+     * @param  \Illuminate\Http\Request  $request
      * @return \Illuminate\Http\JsonResponse
      */
-    public function getAllGurus()
+    public function getAllGurus(Request $request)
     {
         try {
+            $perPage = $request->input('per_page', 10);
+            
             $gurus = User::with('guru')
                 ->where('role', 'guru')
-                ->get()
-                ->map(function ($user) {
-                    return [
-                        'id' => $user->id,
-                        'username' => $user->username,
-                        'role' => $user->role,
-                        'status_aktif' => $user->status_aktif,
-                        'createdAt' => $user->createdAt,
-                        'updatedAt' => $user->updatedAt,
-                        'profile' => $user->guru ? [
-                            'guru_id' => $user->guru->guru_id,
-                            'nama_lengkap' => $user->guru->nama_lengkap,
-                        ] : null,
-                    ];
-                });
+                ->paginate($perPage);
+
+            $data = $gurus->map(function ($user) {
+                return [
+                    'id' => $user->id,
+                    'username' => $user->username,
+                    'role' => $user->role,
+                    'status_aktif' => $user->status_aktif,
+                    'createdAt' => $user->createdAt,
+                    'updatedAt' => $user->updatedAt,
+                    'profile' => $user->guru ? [
+                        'guru_id' => $user->guru->guru_id,
+                        'nama_lengkap' => $user->guru->nama_lengkap,
+                    ] : null,
+                ];
+            });
 
             return response()->json([
                 'success' => true,
                 'message' => 'Guru users retrieved successfully',
-                'data' => $gurus,
+                'data' => $data,
+                'pagination' => [
+                    'current_page' => $gurus->currentPage(),
+                    'last_page' => $gurus->lastPage(),
+                    'per_page' => $gurus->perPage(),
+                    'total' => $gurus->total(),
+                    'from' => $gurus->firstItem(),
+                    'to' => $gurus->lastItem(),
+                ],
             ], 200);
         } catch (\Exception $e) {
             return response()->json([
@@ -152,36 +188,57 @@ class UsersController extends Controller
     /**
      * Get all users with siswa role.
      *
+     * @param  \Illuminate\Http\Request  $request
      * @return \Illuminate\Http\JsonResponse
      */
-    public function getAllSiswas()
+    public function getAllSiswas(Request $request)
     {
         try {
-            $siswas = User::with('siswa')
-                ->where('role', 'siswa')
-                ->get()
-                ->map(function ($user) {
-                    return [
-                        'id' => $user->id,
-                        'username' => $user->username,
-                        'role' => $user->role,
-                        'status_aktif' => $user->status_aktif,
-                        'createdAt' => $user->createdAt,
-                        'updatedAt' => $user->updatedAt,
-                        'profile' => $user->siswa ? [
-                            'siswa_id' => $user->siswa->siswa_id,
-                            'nama_lengkap' => $user->siswa->nama_lengkap,
-                            'kelas' => $user->siswa->kelas,
-                            'tingkat' => $user->siswa->tingkat,
-                            'jurusan' => $user->siswa->jurusan,
-                        ] : null,
-                    ];
+            $perPage = $request->input('per_page', 10);
+            $search = $request->input('search');
+            
+            $query = User::with('siswa')
+                ->where('role', 'siswa');
+            
+            // Add search functionality if search parameter is provided
+            if ($search) {
+                $query->whereHas('siswa', function ($q) use ($search) {
+                    $q->where('nama_lengkap', 'like', '%' . $search . '%');
                 });
+            }
+            
+            $siswas = $query->paginate($perPage);
+
+            $data = $siswas->map(function ($user) {
+                return [
+                    'id' => $user->id,
+                    'username' => $user->username,
+                    'role' => $user->role,
+                    'status_aktif' => $user->status_aktif,
+                    'createdAt' => $user->createdAt,
+                    'updatedAt' => $user->updatedAt,
+                    'profile' => $user->siswa ? [
+                        'siswa_id' => $user->siswa->siswa_id,
+                        'nama_lengkap' => $user->siswa->nama_lengkap,
+                        'kelas' => $user->siswa->kelas,
+                        'tingkat' => $user->siswa->tingkat,
+                        'jurusan' => $user->siswa->jurusan,
+                    ] : null,
+                ];
+            });
 
             return response()->json([
                 'success' => true,
                 'message' => 'Siswa users retrieved successfully',
-                'data' => $siswas,
+                'data' => $data,
+                'pagination' => [
+                    'current_page' => $siswas->currentPage(),
+                    'last_page' => $siswas->lastPage(),
+                    'per_page' => $siswas->perPage(),
+                    'total' => $siswas->total(),
+                    'from' => $siswas->firstItem(),
+                    'to' => $siswas->lastItem(),
+                ],
             ], 200);
         } catch (\Exception $e) {
             return response()->json([
