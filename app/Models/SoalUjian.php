@@ -14,4 +14,9 @@ class SoalUjian extends Model
     {
         return $this->belongsTo(Ujian::class, 'ujian_id', 'ujian_id');
     }
+
+    public function soals()
+    {
+        return $this->belongsTo(Soal::class, 'soal_id', 'soal_id');
+    }
 }

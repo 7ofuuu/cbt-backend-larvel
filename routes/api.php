@@ -5,6 +5,7 @@ use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\UsersController;
 use App\Http\Controllers\HasilUjianController;
 use App\Http\Controllers\SoalController;
+use App\Http\Controllers\SiswaController;
 
 Route::get('/users', [UsersController::class, 'getAllUsers']);
 Route::get('/users/admins', [UsersController::class, 'getAllAdmins']);
@@ -30,4 +31,13 @@ Route::prefix('soal')->group(function () {
     Route::get('/{id}', [SoalController::class, 'getSoalById']);                       //Get soal by ID
     Route::put('/{id}', [SoalController::class, 'updateSoal']);                        //Update soal
     Route::delete('/{id}', [SoalController::class, 'deleteSoal']);                     //Delete soal
+});
+
+Route::prefix('siswa')->group(function () {
+    Route::middleware('auth:sanctum')->group(function () {
+        Route::get('/ujians', [SiswaController::class, 'getMyUjians']);
+        Route::post('/ujians/start', [SiswaController::class, 'startUjian']);
+        Route::post('/ujians/jawaban', [SiswaController::class, 'submitJawaban']);
+        Route::post('/ujians/finish', [SiswaController::class, 'finishUjian']);
+    });
 });

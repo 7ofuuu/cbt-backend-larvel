@@ -20,6 +20,11 @@ class PesertaUjian extends Model
         return $this->hasOne(HasilUjian::class, 'peserta_ujian_id', 'peserta_ujian_id');
     }
 
+    public function jawabans()
+    {
+        return $this->hasMany(\App\Models\Jawaban::class, 'peserta_ujian_id', 'peserta_ujian_id');
+    }
+
     public function ujians()
     {
         return $this->belongsTo(Ujian::class, 'ujian_id', 'ujian_id');
